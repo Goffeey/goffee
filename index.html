@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8" />
+
+  <!-- iPhone / Safari setup -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="One Call Larry" />
+  <meta name="application-name" content="One Call Larry" />
+  <meta name="format-detection" content="telephone=no, email=no, address=no" />
+  <meta name="theme-color" content="#f2cf3d" />
+  <meta name="color-scheme" content="light" />
+  <meta name="description" content="One Call Larry: quick, private email tone and objection analysis." />
+
+  <!-- Home-screen icon: drawn when the page loads, so no image file is needed -->
+  <script>
+    (function () {
+      try {
+        var s = 180, c = document.createElement("canvas");
+        c.width = c.height = s;
+        var x = c.getContext("2d");
+        x.fillStyle = "#f2cf3d";
+        x.fillRect(0, 0, s, s);
+        x.fillStyle = "#0a0a0a";
+        var f = 36;
+        x.font = "900 " + f + "px -apple-system, 'Helvetica Neue', Arial, sans-serif";
+        x.textBaseline = "middle";
+        var letters = "LARRY".split(""), gap = f * 0.12, w = 0;
+        letters.forEach(function (ch) { w += x.measureText(ch).width; });
+        w += gap * (letters.length - 1);
+        var cx = (s - w) / 2;
+        letters.forEach(function (ch) { x.fillText(ch, cx, s / 2); cx += x.measureText(ch).width + gap; });
+        x.fillRect((s - w * 0.34) / 2, s / 2 + f * 0.75, w * 0.34, 4.5);
+        x.font = "900 18px -apple-system, Helvetica, Arial, sans-serif";
+        x.textAlign = "center";
+        x.fillText("ONE CALL", s / 2, s / 2 - 34);
+        var url = c.toDataURL("image/png");
+        ["apple-touch-icon", "icon"].forEach(function (rel) {
+          var l = document.createElement("link");
+          l.rel = rel;
+          l.href = url;
+          if (rel === "apple-touch-icon") l.setAttribute("sizes", "180x180");
+          document.head.appendChild(l);
+        });
+      } catch (e) { /* icon is optional */ }
+    })();
+  </script>
+
+  <title>One Call Larry</title>
+
+  <style>
+    :root {
+      --yellow: #f2cf3d;
+      --yellow-deep: #e0b91d;
+      --ink: #0a0a0a;
+      --paper: #f7f1e7;
+      --soft: #efe3d0;
+      --line: #d9b95d;
+      --muted: #47413b;
+      --green: #dfead7;
+      --blue: #dfe8f6;
+      --white: #ffffff;
+      --desk: #d8d1c6;
+
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+
+      --font: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, Helvetica, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+      height: 100%;
+      background: var(--ink); /* shows behind the iPhone status bar */
+    }
+
+    body {
+      margin: 0;
+      min-height: 100%;
+      min-height: 100dvh;
+      background: var(--desk);
+      font-family: var(--font);
+      color: var(--ink);
+      -webkit-tap-highlight-color: transparent;
+      overscroll-behavior-y: none;
+    }
+
+    /* Black strip under the status bar (only has height on notched iPhones) */
+    .status-strip {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--safe-top);
+      background: var(--ink);
+      z-index: 50;
+    }
+
+    button, .launcher { touch-action: manipulation; }
+
+    /* ---------- Launcher (yellow square) ---------- */
+
+    .launch-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: calc(var(--safe-top) + 24px) calc(var(--safe-right) + 24px)
+               calc(var(--safe-bottom) + 24px) calc(var(--safe-left) + 24px);
+      background: var(--desk);
+      z-index: 10;
+      transition: opacity 0.25s ease;
+    }
+
+    .launch-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .launcher {
+      width: min(290px, 70vw);
+      aspect-ratio: 1 / 1;
+      border: 4px solid var(--ink);
+      background: var(--yellow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      box-shadow: 0 12px 0 rgba(0,0,0,0.15);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      font: inherit;
+      color: inherit;
+      padding: 0;
+    }
+
+    .launcher:hover { transform: translateY(-2px); box-shadow: 0 14px 0 rgba(0,0,0,0.15); }
+    .launcher:active { transform: translateY(2px); box-shadow: 0 8px 0 rgba(0,0,0,0.15); }
+    .launcher:focus-visible { outline: 4px solid var(--ink); outline-offset: 6px; }
+
+    .brand-prefix { display: block; font-size: 0.42em; letter-spacing: 0.12em; margin-bottom: 0.45em; text-align: center; }
+    .title { text-align: center; }
+
+    .launcher-text {
+      font-size: clamp(42px, 13vw, 72px);
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      line-height: 1;
+      transform: translateX(0.07em); /* balances the trailing letter-spacing */
+    }
+
+    .launch-caption {
+      position: absolute;
+      left: 0; right: 0;
+      bottom: calc(var(--safe-bottom) + 28px);
+      text-align: center;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .is-standalone .launcher { animation: pop 0.45s ease-out both; }
+
+    @keyframes pop {
+      from { transform: scale(0.92); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
+    }
+
+    /* ---------- App window ---------- */
+
+    .stage {
+      display: none;
+      min-height: 100dvh;
+      padding: calc(var(--safe-top) + 28px) calc(var(--safe-right) + 28px)
+               calc(var(--safe-bottom) + 28px) calc(var(--safe-left) + 28px);
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    .stage.visible { display: flex; }
+
+    .window {
+      width: min(980px, 100%);
+      background: var(--paper);
+      border: 4px solid var(--ink);
+      box-shadow: 0 18px 0 rgba(0,0,0,0.12);
+      animation: open 0.22s ease-out both;
+    }
+
+    @keyframes open {
+      from { transform: translateY(12px) scale(0.985); opacity: 0; }
+      to   { transform: none; opacity: 1; }
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 62px;
+      background: var(--yellow);
+      border-bottom: 4px solid var(--ink);
+      padding: 0 16px;
+      position: sticky;
+      top: var(--safe-top);
+      z-index: 5;
+    }
+
+    .traffic { display: flex; gap: 10px; width: 78px; }
+
+    .traffic-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 3px solid var(--ink);
+      background: transparent;
+      padding: 0;
+      min-height: 0;
+      flex: 0 0 18px;
+      box-shadow: none;
+      cursor: default;
+      display: block;
+    }
+
+    .traffic-dot.close {
+      cursor: pointer;
+      position: relative;
+    }
+
+    /* Bigger invisible tap target for the close dot */
+    .traffic-dot.close::after {
+      content: "";
+      position: absolute;
+      inset: -12px;
+    }
+
+    .traffic-dot.close:hover, .traffic-dot.close:active { background: var(--ink); }
+
+    .title {
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    .spacer { width: 78px; }
+
+    .body {
+      display: grid;
+      grid-template-columns: 1.35fr 0.95fr;
+      gap: 20px;
+      padding: 20px;
+      align-items: start;
+    }
+
+    .panel {
+      background: #fffdfb;
+      border: 3px solid var(--ink);
+      padding: 14px;
+    }
+
+    .label {
+      display: block;
+      margin: 0 0 8px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 355px;
+      border: 3px solid var(--ink);
+      border-radius: 0;
+      background: #fffdf9;
+      color: var(--ink);
+      font-size: 16px; /* 16px stops iPhone Safari zooming in when you tap the box */
+      line-height: 1.5;
+      resize: vertical;
+      padding: 14px 16px;
+      outline: none;
+      font-family: var(--font);
+      -webkit-appearance: none;
+      appearance: none;
+    }
+
+    textarea:focus { box-shadow: inset 0 0 0 2px var(--yellow); }
+
+    .button-row {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      -webkit-appearance: none;
+      appearance: none;
+      border-radius: 0;
+      background: var(--yellow);
+      border: 3px solid var(--ink);
+      color: var(--ink);
+      min-height: 44px; /* Apple's minimum comfortable tap size */
+      padding: 10px 18px;
+      font-family: var(--font);
+      font-size: 14px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      box-shadow: 0 4px 0 rgba(0,0,0,0.18);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.12s ease;
+    }
+
+    button:hover { background: var(--yellow-deep); }
+    button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.18); }
+    button:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+    button.secondary { background: var(--white); }
+    button.secondary:hover { background: var(--soft); }
+
+    button.small {
+      min-height: 36px;
+      padding: 6px 12px;
+      font-size: 11px;
+      box-shadow: 0 3px 0 rgba(0,0,0,0.18);
+    }
+
+    .primary-btn { flex: 0 0 auto; }
+
+    .message {
+      min-height: 18px;
+      margin: 10px 0 0;
+      font-size: 13px;
+      font-weight: 700;
+      color: #8a1c00;
+    }
+
+    .hint {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .side {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      scroll-margin-top: calc(var(--safe-top) + 80px);
+    }
+
+    .mini-card {
+      background: var(--soft);
+      border: 3px solid var(--ink);
+      padding: 12px 14px;
+    }
+
+    .mini-card h3, .box-title {
+      margin: 0 0 10px;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      font-size: 15px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(0,0,0,0.18);
+    }
+
+    .stat-row:last-child { border-bottom: none; }
+
+    .stat-row strong {
+      font-weight: 800;
+      text-transform: capitalize;
+      padding: 2px 8px;
+      border: 2px solid transparent;
+    }
+
+    /* Colour hints for low / medium / high. Text stays the same. */
+    .lvl-low    { background: #d6ead0; border-color: var(--ink) !important; }
+    .lvl-medium { background: #f6e39a; border-color: var(--ink) !important; }
+    .lvl-high   { background: #f3b9a6; border-color: var(--ink) !important; }
+
+    .analysis-box, .recommendation-box {
+      border: 3px solid var(--ink);
+      padding: 14px;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .analysis-box { background: var(--blue); min-height: 170px; }
+    .recommendation-box { background: var(--green); min-height: 220px; }
+
+    .out {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    .box-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .box-head .box-title { margin: 0; }
+
+    .copy-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .footnote {
+      margin: 0;
+      padding: 0 20px 18px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(var(--safe-bottom) + 24px);
+      transform: translate(-50%, 20px);
+      background: var(--ink);
+      color: var(--yellow);
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 12px 18px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 60;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    /* ---------- Phone layout ---------- */
+
+    @media (max-width: 760px) {
+      .stage {
+        padding: 0;
+        padding-left: var(--safe-left);
+        padding-right: var(--safe-right);
+      }
+
+      .window {
+        width: 100%;
+        min-height: 100dvh;
+        border: none;
+        box-shadow: none;
+        animation-duration: 0.18s;
+      }
+
+      .header {
+        height: calc(56px + var(--safe-top));
+        padding-top: var(--safe-top);
+        top: 0;
+        border-bottom-width: 3px;
+      }
+
+      .title { font-size: 17px; }
+
+      .body {
+        grid-template-columns: 1fr;
+        gap: 16px;
+        padding: 14px;
+      }
+
+      textarea { min-height: 240px; }
+
+      .button-row .primary-btn { flex: 1 1 100%; min-height: 50px; font-size: 15px; }
+      .button-row .secondary { flex: 1 1 0; }
+
+      .footnote { padding: 0 14px calc(var(--safe-bottom) + 18px); }
+    }
+
+    /* Landscape phones: keep content clear of the notch */
+    @media (max-height: 500px) and (orientation: landscape) {
+      textarea { min-height: 160px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="status-strip" aria-hidden="true"></div>
+
+  <!-- Launcher -->
+  <div id="launchScreen" class="launch-screen">
+    <button id="launcher" class="launcher" type="button" aria-label="Open One Call Larry">
+      <span class="launcher-text"><span class="brand-prefix">One Call</span>Larry</span>
+    </button>
+    <div id="launchCaption" class="launch-caption">Tap to open</div>
+  </div>
+
+  <!-- App -->
+  <div id="stage" class="stage">
+    <div id="window" class="window" role="application" aria-label="One Call Larry email analysis">
+      <div class="header">
+        <div class="traffic">
+          <button id="closeBtn" class="traffic-dot close" type="button" aria-label="Close One Call Larry"></button>
+          <span class="traffic-dot" aria-hidden="true"></span>
+          <span class="traffic-dot" aria-hidden="true"></span>
+        </div>
+        <div class="title"><span class="brand-prefix">ONE CALL</span>LARRY</div>
+        <div class="spacer"></div>
+      </div>
+
+      <div class="body">
+        <div class="panel">
+          <label class="label" for="emailInput">Email or thread</label>
+          <textarea id="emailInput"
+                    placeholder="Paste one or more emails here. You can copy your thread and then tap Analyze."
+                    autocapitalize="sentences" autocomplete="off" spellcheck="true"></textarea>
+
+          <div class="button-row">
+            <button id="analyzeBtn" class="primary-btn" type="button">Analyze</button>
+            <button id="pasteBtn" class="secondary" type="button">Paste</button>
+            <button id="sampleBtn" class="secondary" type="button">Sample</button>
+            <button id="clearBtn" class="secondary" type="button">Clear</button>
+          </div>
+
+          <p id="message" class="message" role="status" aria-live="polite"></p>
+          <p class="hint">Paste one email or a whole thread. One Call Larry will estimate tone, urgency, objections, resistance, and recommend the next question.</p>
+        </div>
+
+        <div id="results" class="side" aria-live="polite">
+          <div class="mini-card">
+            <h3>Analysis</h3>
+            <div class="stat-row"><span>Tone</span><strong id="tone">—</strong></div>
+            <div class="stat-row"><span>Urgency</span><strong id="urgency">—</strong></div>
+            <div class="stat-row"><span>Pressure</span><strong id="pressure">—</strong></div>
+            <div class="stat-row"><span>Objection</span><strong id="objection">—</strong></div>
+            <div class="stat-row"><span>Resistance</span><strong id="resistance">—</strong></div>
+          </div>
+
+          <div class="analysis-box">
+            <div class="box-head"><h3 class="box-title">Hidden intent</h3></div>
+            <div id="intentBox" class="out">No analysis yet.</div>
+          </div>
+
+          <div class="recommendation-box">
+            <div class="box-head"><h3 class="box-title">Recommendation</h3></div>
+            <div id="recommendationBox" class="out">No recommendation yet.</div>
+            <div class="copy-row">
+              <button id="copyQuestionBtn" class="secondary small" type="button" disabled>Copy question</button>
+              <button id="copyReplyBtn" class="secondary small" type="button" disabled>Copy reply</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="footnote">One Call Larry uses keyword rules, so treat results as a quick prompt for your own judgement, not a verdict. Everything runs on this device. Nothing you paste is sent anywhere or saved.</p>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var SAMPLE_TEXT = "Hi Larry,\n\nWe need a little more time before we can commit. We are still reviewing the pricing and internal approval steps.\n\nThanks,\nJane\n\n---\n\nHi Jane,\n\nI understand timing is part of this. I just want to make sure we are aligned on the actual blocker so we can move forward efficiently.\n\nThanks,\nLarry";
+
+      var launchScreen = document.getElementById("launchScreen");
+      var launcher = document.getElementById("launcher");
+      var launchCaption = document.getElementById("launchCaption");
+      var stage = document.getElementById("stage");
+      var closeBtn = document.getElementById("closeBtn");
+      var analyzeBtn = document.getElementById("analyzeBtn");
+      var pasteBtn = document.getElementById("pasteBtn");
+      var sampleBtn = document.getElementById("sampleBtn");
+      var clearBtn = document.getElementById("clearBtn");
+      var copyQuestionBtn = document.getElementById("copyQuestionBtn");
+      var copyReplyBtn = document.getElementById("copyReplyBtn");
+      var input = document.getElementById("emailInput");
+      var message = document.getElementById("message");
+      var results = document.getElementById("results");
+      var toast = document.getElementById("toast");
+
+      var lastRecommendation = null;
+
+      // ---------- Environment ----------
+
+      var isStandalone =
+        window.navigator.standalone === true ||
+        (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+
+      var isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
+
+      if (isStandalone) {
+        document.documentElement.classList.add("is-standalone");
+      }
+
+      // ---------- Open / close ----------
+
+      var opened = false;
+
+      function openApp() {
+        if (opened) return;
+        opened = true;
+        launchScreen.classList.add("hidden");
+        stage.classList.add("visible");
+        window.scrollTo(0, 0);
+        // On a phone, focusing would pop the keyboard straight away, so only focus on desktop.
+        if (!isTouch) input.focus();
+      }
+
+      function closeApp() {
+        opened = false;
+        stage.classList.remove("visible");
+        launchScreen.classList.remove("hidden");
+        launchCaption.textContent = "Tap to open";
+        input.blur();
+        launcher.focus();
+      }
+
+      launcher.addEventListener("click", openApp);
+      closeBtn.addEventListener("click", closeApp);
+
+      // From the home screen, the yellow square acts as a launch screen and opens by itself.
+      if (isStandalone) {
+        launchCaption.textContent = "";
+        setTimeout(openApp, 900);
+      }
+
+      // ---------- Original analysis logic (unchanged rules and order) ----------
+
+      function normalizeText(value) {
+        return (value || "").replace(/\r\n/g, "\n").trim();
+      }
+
+      function heuristicAnalysis(threadText) {
+        const text = threadText.toLowerCase();
+
+        let tone = "calm";
+        let urgency = "low";
+        let pressure = "low";
+        let objection = "other";
+        let resistance = "low";
+        let hiddenIntent = "No strong signal detected.";
+        let confidence = 0.62;
+        let notes = "Fallback heuristic analysis used.";
+
+        if (
+          text.includes("delay") ||
+          text.includes("timing") ||
+          text.includes("review") ||
+          text.includes("need more time") ||
+          text.includes("not yet")
+        ) {
+          tone = "defensive";
+          urgency = "medium";
+          pressure = "medium";
+          objection = "timing";
+          resistance = "medium";
+          hiddenIntent = "The sender is delaying commitment while preserving leverage.";
+          confidence = 0.82;
+          notes = "Timing language and delay cues suggest reluctance to commit.";
+        }
+
+        if (
+          text.includes("price") ||
+          text.includes("cost") ||
+          text.includes("budget") ||
+          text.includes("pricing")
+        ) {
+          tone = "guarded";
+          urgency = "medium";
+          pressure = "medium";
+          objection = "price";
+          resistance = "high";
+          hiddenIntent = "The sender is testing flexibility and looking for a better position.";
+          confidence = 0.8;
+          notes = "Price concerns suggest negotiation pressure.";
+        }
+
+        if (
+          text.includes("urgent") ||
+          text.includes("asap") ||
+          text.includes("immediately") ||
+          text.includes("today")
+        ) {
+          urgency = "high";
+          pressure = "high";
+          tone = "urgent";
+        }
+
+        if (
+          text.includes("not comfortable") ||
+          text.includes("need to think") ||
+          text.includes("unsure") ||
+          text.includes("we will consider")
+        ) {
+          tone = "evasive";
+          resistance = "medium";
+          hiddenIntent = "The sender is avoiding a direct decision without saying no outright.";
+        }
+
+        if (
+          text.includes("trust") ||
+          text.includes("risk") ||
+          text.includes("confidence") ||
+          text.includes("reputation")
+        ) {
+          objection = "trust";
+          resistance = "medium";
+        }
+
+        if (
+          text.includes("approval") ||
+          text.includes("committee") ||
+          text.includes("legal") ||
+          text.includes("authority")
+        ) {
+          objection = "authority";
+        }
+
+        if (
+          text.includes("process") ||
+          text.includes("policy") ||
+          text.includes("procedure")
+        ) {
+          objection = "process";
+        }
+
+        return {
+          tone,
+          urgency,
+          pressure,
+          objection,
+          resistance,
+          hiddenIntent,
+          confidence,
+          notes
+        };
+      }
+
+      function buildRecommendation(analysis) {
+        const objection = analysis.objection || "other";
+
+        if (objection === "timing") {
+          return {
+            question: "Can you confirm whether the only blocker is timing, or are there additional concerns we should address before moving forward?",
+            draft: "Thanks for the update. I understand timing is part of the issue, and I want to make sure we address the actual blocker clearly. Can you confirm whether the only concern is timing, or whether there are additional points we should resolve before moving ahead?"
+          };
+        }
+
+        if (objection === "price") {
+          return {
+            question: "Would you be open to discussing the pricing concern directly, so we can understand whether the issue is the overall cost, the structure, or the timing of the decision?",
+            draft: "I understand the pricing concern. To move this forward constructively, I’d like to understand whether the issue is the overall cost, the structure of the proposal, or the timing of the decision. If helpful, we can work through the exact point of friction."
+          };
+        }
+
+        if (objection === "authority") {
+          return {
+            question: "Who needs to be involved for a decision to move forward, and what would they need to see before moving ahead?",
+            draft: "I appreciate the update. To avoid unnecessary delay, could you let me know who needs to be involved and what they would need to see in order to move this forward?"
+          };
+        }
+
+        return {
+          question: "Could you clarify what would need to happen for us to move this forward in a way that works for both sides?",
+          draft: "I appreciate the update. To make sure we are aligned, could you clarify what would need to happen for us to move this forward in a way that works for both sides?"
+        };
+      }
+
+      // ---------- Rendering ----------
+
+      function setStat(id, value) {
+        var el = document.getElementById(id);
+        el.textContent = value || "—";
+        el.classList.remove("lvl-low", "lvl-medium", "lvl-high");
+        if (value === "low" || value === "medium" || value === "high") {
+          el.classList.add("lvl-" + value);
+        }
+      }
+
+      function renderResults(analysis, recommendation) {
+        setStat("tone", analysis.tone);
+        setStat("urgency", analysis.urgency);
+        setStat("pressure", analysis.pressure);
+        setStat("objection", analysis.objection);
+        setStat("resistance", analysis.resistance);
+
+        var intentText =
+          "Hidden intent: " + (analysis.hiddenIntent || "No clear signal") + "\n\n" +
+          "Confidence: " + (analysis.confidence || 0).toFixed(2) + "\n\n" +
+          "Notes: " + (analysis.notes || "No notes");
+
+        document.getElementById("intentBox").textContent = intentText;
+
+        var recText =
+          "Recommended question:\n\n" + recommendation.question + "\n\n" +
+          "Suggested reply:\n\n" + recommendation.draft;
+
+        document.getElementById("recommendationBox").textContent = recText;
+
+        lastRecommendation = recommendation;
+        copyQuestionBtn.disabled = false;
+        copyReplyBtn.disabled = false;
+      }
+
+      function resetResults() {
+        ["tone", "urgency", "pressure", "objection", "resistance"].forEach(function (id) {
+          setStat(id, "");
+        });
+        document.getElementById("intentBox").textContent = "No analysis yet.";
+        document.getElementById("recommendationBox").textContent = "No recommendation yet.";
+        lastRecommendation = null;
+        copyQuestionBtn.disabled = true;
+        copyReplyBtn.disabled = true;
+      }
+
+      function analyze(scrollToResults) {
+        var text = normalizeText(input.value);
+
+        if (!text) {
+          message.textContent = "Please paste at least one email.";
+          return;
+        }
+
+        message.textContent = "";
+        var analysis = heuristicAnalysis(text);
+        var recommendation = buildRecommendation(analysis);
+        renderResults(analysis, recommendation);
+
+        // On a phone the results sit below the text box, so bring them into view.
+        if (scrollToResults && window.matchMedia("(max-width: 760px)").matches) {
+          input.blur();
+          results.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }
+
+      // ---------- Helpers ----------
+
+      var toastTimer = null;
+      function showToast(text) {
+        toast.textContent = text;
+        toast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { toast.classList.remove("show"); }, 1600);
+      }
+
+      function fallbackCopy(text) {
+        var ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.top = "-1000px";
+        ta.style.fontSize = "16px";
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, text.length);
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+        document.body.removeChild(ta);
+        return ok;
+      }
+
+      function copyText(text, label) {
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(text).then(
+            function () { showToast(label + " copied"); },
+            function () { showToast(fallbackCopy(text) ? label + " copied" : "Copy failed: press and hold to copy"); }
+          );
+        } else {
+          showToast(fallbackCopy(text) ? label + " copied" : "Copy failed: press and hold to copy");
+        }
+      }
+
+      // ---------- Buttons ----------
+
+      analyzeBtn.addEventListener("click", function () { analyze(true); });
+
+      sampleBtn.addEventListener("click", function () {
+        input.value = SAMPLE_TEXT;
+        analyze(false);
+        showToast("Sample loaded");
+      });
+
+      clearBtn.addEventListener("click", function () {
+        input.value = "";
+        message.textContent = "";
+        resetResults();
+        if (!isTouch) input.focus();
+      });
+
+      pasteBtn.addEventListener("click", function () {
+        if (navigator.clipboard && navigator.clipboard.readText && window.isSecureContext) {
+          navigator.clipboard.readText().then(function (clip) {
+            if (clip && clip.trim()) {
+              input.value = clip;
+              message.textContent = "";
+              showToast("Pasted");
+            } else {
+              showToast("Clipboard is empty");
+            }
+          }).catch(function () {
+            input.focus();
+            showToast("Tap the box, then Paste");
+          });
+        } else {
+          input.focus();
+          showToast("Tap the box, then Paste");
+        }
+      });
+
+      copyQuestionBtn.addEventListener("click", function () {
+        if (lastRecommendation) copyText(lastRecommendation.question, "Question");
+      });
+
+      copyReplyBtn.addEventListener("click", function () {
+        if (lastRecommendation) copyText(lastRecommendation.draft, "Reply");
+      });
+
+      // Cmd/Ctrl + Enter runs Analyze (handy with a keyboard)
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+          e.preventDefault();
+          analyze(true);
+        }
+      });
+
+      input.addEventListener("input", function () {
+        if (message.textContent) message.textContent = "";
+      });
+
+      // ---------- iPhone launch image (best effort) ----------
+      // Draws a yellow LARRY launch image sized for this exact device and offers it
+      // to iOS. It is picked up when you tap Add to Home Screen.
+
+      function makeLaunchImage(w, h) {
+        try {
+          var ratio = window.devicePixelRatio || 1;
+          var canvas = document.createElement("canvas");
+          canvas.width = Math.round(w * ratio);
+          canvas.height = Math.round(h * ratio);
+          var ctx = canvas.getContext("2d");
+          if (!ctx) return null;
+          ctx.scale(ratio, ratio);
+
+          ctx.fillStyle = "#d8d1c6";
+          ctx.fillRect(0, 0, w, h);
+
+          var side = Math.min(290, Math.min(w, h) * 0.7);
+          var x = (w - side) / 2;
+          var y = (h - side) / 2;
+
+          ctx.fillStyle = "rgba(0,0,0,0.15)";
+          ctx.fillRect(x, y + 12, side, side);
+          ctx.fillStyle = "#f2cf3d";
+          ctx.fillRect(x, y, side, side);
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = "#0a0a0a";
+          ctx.strokeRect(x + 2, y + 2, side - 4, side - 4);
+
+          var fontSize = Math.round(side * 0.24);
+          ctx.fillStyle = "#0a0a0a";
+          ctx.font = "900 " + fontSize + "px -apple-system, 'Helvetica Neue', Arial, sans-serif";
+          ctx.textBaseline = "middle";
+
+          var letters = "LARRY".split("");
+          var spacing = fontSize * 0.14;
+          var total = 0;
+          letters.forEach(function (c) { total += ctx.measureText(c).width; });
+          total += spacing * (letters.length - 1);
+          var cx = (w - total) / 2;
+          letters.forEach(function (c) {
+            ctx.fillText(c, cx, y + side / 2);
+            cx += ctx.measureText(c).width + spacing;
+          });
+
+          ctx.font = "900 " + Math.round(fontSize * 0.42) + "px -apple-system, Helvetica, Arial, sans-serif";
+          ctx.textAlign = "center";
+          ctx.fillText("ONE CALL", w / 2, y + side / 2 - fontSize * 0.85);
+          return canvas.toDataURL("image/png");
+        } catch (e) {
+          return null;
+        }
+      }
+
+      function addLaunchImages() {
+        var ua = navigator.userAgent || "";
+        var isAppleMobile = /iPhone|iPad|iPod/.test(ua) ||
+          (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+        if (!isAppleMobile) return;
+
+        var sw = Math.min(screen.width, screen.height);
+        var sh = Math.max(screen.width, screen.height);
+        var ratio = window.devicePixelRatio || 1;
+
+        [["portrait", sw, sh], ["landscape", sh, sw]].forEach(function (o) {
+          var url = makeLaunchImage(o[1], o[2]);
+          if (!url) return;
+          var link = document.createElement("link");
+          link.rel = "apple-touch-startup-image";
+          link.media =
+            "(device-width: " + sw + "px) and (device-height: " + sh + "px) and " +
+            "(-webkit-device-pixel-ratio: " + ratio + ") and (orientation: " + o[0] + ")";
+          link.href = url;
+          document.head.appendChild(link);
+        });
+      }
+
+      // ---------- Optional offline support ----------
+      // Only works if you also upload the optional sw.js file next to this one,
+      // and the site is served over https. Without sw.js this does nothing.
+
+      function registerOffline() {
+        if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+        if (location.protocol === "file:") return;
+        navigator.serviceWorker.register("sw.js").catch(function () { /* sw.js not present: fine */ });
+      }
+
+      // ---------- Start ----------
+
+      input.value = SAMPLE_TEXT;
+      addLaunchImages();
+      window.addEventListener("load", registerOffline);
+    })();
+  </script>
+</body>
+</html>
